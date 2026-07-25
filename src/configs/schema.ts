@@ -114,6 +114,7 @@ export const doubtsTable = pgTable("doubts", {
     classroomId: integer(),
     subject: varchar({ length: 100 }).notNull(),
     subTopic: varchar({ length: 255 }),
+    difficulty: varchar({ length: 20 }).default("intermediate"),
     content: text(),
     imageUrl: text(),
     likes: integer().default(0),

@@ -31,7 +31,7 @@ import { buildErrorResponse, errorResponse } from "@/lib/errors/error-handler";
 import { checkUserBlock } from "@/lib/auth/auth-utils";
 import { parseAndValidateRequest } from "@/lib/validations/validate";
 import { createDoubtSchema } from "@/lib/validations/doubt";
-import { createClassroomDoubtNotifications } from "@/lib/notifications/service";
+import { createClassroomDoubtNotifications, createMentorRoutingNotifications } from "@/lib/notifications/service";
 import { inngest } from "@/inngest/client";
 import { enforceApiRateLimit } from "@/lib/ratelimit/api-rate-limit";
 import { generalLimiter } from "@/lib/ratelimit/ratelimit";
@@ -374,7 +374,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const subTopic = await categorizeDoubt(content || "", subject, imageUrl);
+    const { subTopic, difficulty, suggestedTags } = await categorizeDoubt(content || "", subject, imageUrl);
 
     let parsedCreatedAt: Date | undefined = undefined;
     if (data.createdAt) {
@@ -396,6 +396,7 @@ export async function POST(req: Request) {
         userEmail: email,
         subject,
         subTopic,
+        difficulty,
         content,
         imageUrl,
         classroomId: parsedClassroomId,
@@ -437,7 +438,7 @@ export async function POST(req: Request) {
 
     const normalizedTags: string[] = Array.from(
       new Set(
-        (Array.isArray(tags) ? tags : [])
+        [...(Array.isArray(tags) ? tags : []), ...suggestedTags]
           .map((t: unknown) =>
             typeof t === "string" ? t.trim().replace(/\s+/g, " ").toLowerCase() : "",
           )
@@ -490,6 +491,15 @@ export async function POST(req: Request) {
         await db.insert(doubtTagsTable).values(doubtTagRelations).onConflictDoNothing();
       }
     }
+
+    createMentorRoutingNotifications({
+      doubtId: newDoubt.id,
+      subject,
+      subTopic,
+      difficulty,
+      tags: normalizedTags,
+      authorEmail: email,
+    }).catch((err) => console.error("Mentor routing failure:", err));
 
     // The creator is the author, so `isOwnPost` resolves to true. We still strip
     // the raw userEmail/embedding so the create response matches the read shape.

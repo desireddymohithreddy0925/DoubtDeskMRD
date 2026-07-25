@@ -64,6 +64,41 @@ export async function createClassroomDoubtNotifications(params: {
     return createNotifications(notifications);
 }
 
+export async function createMentorRoutingNotifications(params: {
+    doubtId: number;
+    subject: string;
+    subTopic: string;
+    difficulty: string;
+    tags: string[];
+    authorEmail: string;
+}) {
+    const { doubtId, subject, subTopic, difficulty, tags, authorEmail } = params;
+
+    // A simple mock for routing: find teachers/mentors that match the tags/subject
+    // In a real production system, this might use websockets to find 'online' mentors.
+    const mentorsRows = await db
+        .select({ email: usersTable.email, subjects: usersTable.subjects, interests: usersTable.interests })
+        .from(usersTable)
+        .where(eq(usersTable.role, 'teacher'));
+
+    const matchedMentors = mentorsRows.filter(m => {
+        if (m.email === authorEmail) return false;
+        const mentorTopics = `${m.subjects || ''} ${m.interests || ''}`.toLowerCase();
+        return tags.some(tag => mentorTopics.includes(tag.toLowerCase())) || 
+               mentorTopics.includes(subject.toLowerCase());
+    });
+
+    const notifications = matchedMentors.map(m => ({
+        userEmail: m.email,
+        title: `AI Routed Doubt: ${subject}`,
+        message: `A new ${difficulty} doubt regarding ${subTopic} matches your expertise.`,
+        link: `/doubts/${doubtId}`,
+        type: "mentor_routed_doubt",
+    }));
+
+    return createNotifications(notifications);
+}
+
 export async function createReplyNotification(params: {
     doubtId: number;
     replyId: number;
