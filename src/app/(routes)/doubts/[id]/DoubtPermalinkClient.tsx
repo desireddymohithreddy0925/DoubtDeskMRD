@@ -5,6 +5,8 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import DoubtCard from "@/components/classroom/DoubtCard";
 import DoubtRepliesModal from "@/components/classroom/DoubtRepliesModal";
+import WhiteboardModal from "@/components/WhiteboardModal";
+import { PenTool } from "lucide-react";
 
 interface DoubtPermalinkClientProps {
     initialDoubt: any;
@@ -18,6 +20,7 @@ export default function DoubtPermalinkClient({ initialDoubt }: DoubtPermalinkCli
         hasLiked: false,
         hasBookmarked: false,
     });
+    const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
 
     const fetchDoubt = async () => {
         try {
@@ -60,9 +63,17 @@ export default function DoubtPermalinkClient({ initialDoubt }: DoubtPermalinkCli
                     <ArrowLeft className="w-4 h-4" />
                     Back to Feed
                 </Link>
-                <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase italic">
-                    Doubt <span className="text-blue-500">Permalink</span>
-                </h1>
+                <div className="flex items-center gap-4">
+                    <button 
+                        onClick={() => setIsWhiteboardOpen(true)}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                        <PenTool className="w-4 h-4" /> Open Whiteboard
+                    </button>
+                    <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase italic hidden sm:block">
+                        Doubt <span className="text-blue-500">Permalink</span>
+                    </h1>
+                </div>
             </div>
 
             {/* Content */}
@@ -83,6 +94,12 @@ export default function DoubtPermalinkClient({ initialDoubt }: DoubtPermalinkCli
                     />
                 </div>
             </div>
+
+            <WhiteboardModal 
+                doubtId={doubt.id} 
+                isOpen={isWhiteboardOpen} 
+                onClose={() => setIsWhiteboardOpen(false)} 
+            />
         </div>
     );
 }
