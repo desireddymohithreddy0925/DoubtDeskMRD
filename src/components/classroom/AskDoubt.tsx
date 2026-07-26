@@ -136,14 +136,14 @@ export default function AskDoubt({ defaultSubject = "", isOpen, onClose, onSucce
     const similarityDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const checkSimilarity = async (text: string) => {
-        if (doubtToEdit || text.trim().length < 20) {
+        if (doubtToEdit || text.trim().length < 15) {
             setSimilarDoubts([]);
             setSimilarityChecked(false);
             return;
         }
         setIsCheckingSimilarity(true);
         try {
-            const res = await fetch("/api/doubts/check-similarity", {
+            const res = await fetch("/api/doubts/semantic-search", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ content: text, classroomId }),
@@ -210,7 +210,7 @@ export default function AskDoubt({ defaultSubject = "", isOpen, onClose, onSucce
     }, [defaultSubject, doubtToEdit]);
 
     useEffect(() => {
-        if (content.trim().length < 20) {
+        if (content.trim().length < 15) {
             setSuggestedSubject("");
             setSimilarDoubts([]);
             setSimilarityChecked(false);
@@ -224,11 +224,11 @@ export default function AskDoubt({ defaultSubject = "", isOpen, onClose, onSucce
             setSubject(detectedSubject);
         }
 
-        // Debounced similarity check (fires 1.5s after user stops typing)
+        // Debounced similarity check (fires 0.5s after user stops typing)
         if (similarityDebounceRef.current) clearTimeout(similarityDebounceRef.current);
         similarityDebounceRef.current = setTimeout(() => {
             checkSimilarity(content);
-        }, 1500);
+        }, 500);
 
         return () => {
             if (similarityDebounceRef.current) clearTimeout(similarityDebounceRef.current);

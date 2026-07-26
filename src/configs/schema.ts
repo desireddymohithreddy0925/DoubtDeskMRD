@@ -160,6 +160,7 @@ export const doubtsTable = pgTable("doubts", {
             columns: [table.classroomId],
             foreignColumns: [classroomsTable.id],
         }).onDelete("set null"),
+        embeddingIndex: index("doubts_embedding_idx").using("hnsw", table.embedding.op("vector_cosine_ops")),
     };
 });
 
