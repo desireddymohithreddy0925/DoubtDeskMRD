@@ -4,8 +4,8 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { db } from "../configs/db";
-import { doubtsTable, usersTable, pendingNotificationsTable, repliesTable, videoJobsTable } from "../configs/schema";
-import { eq, inArray, and, lt } from "drizzle-orm";
+import { doubtsTable, usersTable, pendingNotificationsTable, repliesTable, videoJobsTable, classroomFaqsTable } from "../configs/schema";
+import { eq, inArray, and, lt, gte } from "drizzle-orm";
 import { emailNotificationLimiter, redisClient } from "@/lib/ratelimit/ratelimit";
 import { sendReplyNotificationEmail, sendDigestEmail } from "@/lib/email/email";
 import { runVideoPipeline } from "../lib/video/pipeline";
@@ -420,4 +420,111 @@ export const cleanupStaleVideoJobs = inngest.createFunction(
       return { failedStaleJobs: failed.length };
     });
   },
+);
+
+// ── Automated Classroom FAQ & Knowledge Base Generator (issue #1048) ───────
+import { groq } from "@/lib/ai/groq-client";
+
+export const generateWeeklyFaqs = inngest.createFunction(
+  { id: "generate-weekly-faqs", triggers: [{ cron: "0 0 * * 0" }] },
+  async ({ step }: { step: InngestStep }) => {
+    const windowStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const activeClassrooms = await step.run("fetch-active-classrooms", async () => {
+      const recentSolvedDoubts = await db
+        .select({ classroomId: doubtsTable.classroomId })
+        .from(doubtsTable)
+        .where(
+          and(
+            eq(doubtsTable.isSolved, "solved"),
+            gte(doubtsTable.createdAt, windowStart)
+          )
+        );
+      
+      const distinctIds = new Set<number>();
+      for (const d of recentSolvedDoubts) {
+        if (d.classroomId) distinctIds.add(d.classroomId);
+      }
+      return Array.from(distinctIds);
+    });
+
+    if (activeClassrooms.length === 0) {
+      return { message: "No recently solved doubts to generate FAQs for." };
+    }
+
+    let generatedCount = 0;
+
+    for (const classroomId of activeClassrooms) {
+      const result = await step.run(`generate-faqs-for-classroom-${classroomId}`, async () => {
+        const doubts = await db
+          .select({
+            id: doubtsTable.id,
+            subject: doubtsTable.subject,
+            content: doubtsTable.content
+          })
+          .from(doubtsTable)
+          .where(
+            and(
+              eq(doubtsTable.classroomId, classroomId),
+              eq(doubtsTable.isSolved, "solved"),
+              gte(doubtsTable.createdAt, windowStart)
+            )
+          );
+
+        if (doubts.length === 0) return { skipped: true };
+
+        const doubtsText = doubts
+          .map(d => `[ID: ${d.id}] ${d.subject}: ${d.content || ""}`)
+          .join("\n");
+
+        const prompt = `Cluster the following resolved student doubts into 3-5 distinct FAQ topics.
+Return JSON: [{ "topic": "...", "question": "...", "answer": "...", "sourceDoubtIds": [...] }]
+
+Doubts:
+${doubtsText}`;
+
+        const response = await groq.chat.completions.create({
+          messages: [{ role: "user", content: prompt }],
+          model: "llama-3.3-70b-versatile",
+          response_format: { type: "json_object" },
+          temperature: 0.2
+        });
+
+        const rawContent = response.choices[0].message.content || "{}";
+        let parsed = null;
+        try {
+          // LLM might return `{ "faqs": [...] }` or `[...]`. 
+          // We instructed it to return `[{...}]` but json_object mode requires an object root.
+          // Wait, json_object mode strictly requires an object. So we should parse as object.
+          const obj = JSON.parse(rawContent);
+          parsed = Array.isArray(obj) ? obj : (obj.faqs || Object.values(obj)[0]);
+          if (!Array.isArray(parsed)) parsed = [];
+        } catch (e) {
+          console.error("Failed to parse FAQ JSON", e);
+          return { skipped: true };
+        }
+
+        if (parsed && parsed.length > 0) {
+          const toInsert = parsed.map((faq: any) => ({
+            classroomId,
+            topic: faq.topic || "General",
+            question: faq.question || "",
+            answer: faq.answer || "",
+            sourceDoubtIds: Array.isArray(faq.sourceDoubtIds) ? faq.sourceDoubtIds : [],
+            isPublished: false
+          }));
+
+          await db.insert(classroomFaqsTable).values(toInsert);
+          return { generated: toInsert.length };
+        }
+        return { skipped: true };
+      });
+
+      if (result.generated) {
+        generatedCount += result.generated;
+      }
+    }
+
+    return { message: `Successfully generated ${generatedCount} FAQs across ${activeClassrooms.length} classrooms.` };
+  }
 );

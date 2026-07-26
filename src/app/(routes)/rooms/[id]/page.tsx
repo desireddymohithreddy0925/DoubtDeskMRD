@@ -10,6 +10,12 @@ import { useEffect, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useAppUser } from "@/app/provider";
 import AnalyticsExportButton from "@/components/common/AnalyticsExportButton";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { QRCodeCanvas } from "qrcode.react";
 import {
   Brain,
@@ -113,6 +119,8 @@ export default function ClassroomPage() {
   const [pedagogyLevel, setPedagogyLevel] = useState("");
   const [targetGrade, setTargetGrade] = useState("");
   const [pedagogyProfile, setPedagogyProfile] = useState<any>(null);
+  const [faqs, setFaqs] = useState<any[]>([]);
+  const [faqsLoading, setFaqsLoading] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [subjectFilter, setSubjectFilter] = useState("All");
@@ -127,12 +135,13 @@ export default function ClassroomPage() {
     return () => clearTimeout(timer);
   }, [searchVal]);
 
- useEffect(() => {
+  useEffect(() => {
     if (
       notificationTab === "community" ||
       notificationTab === "teacher-doubts" ||
       notificationTab === "ask-ai" ||
-      notificationTab === "insights"
+      notificationTab === "insights" ||
+      notificationTab === "knowledge-base"
     ) {
       setActiveTab(notificationTab);
     }
@@ -140,6 +149,18 @@ export default function ClassroomPage() {
       setActiveTab("community");
     }
   }, [notificationTab, searchParams]);
+
+  useEffect(() => {
+    if (activeTab === "knowledge-base" && classroom?.id) {
+      setFaqsLoading(true);
+      fetch(`/api/rooms/${classroom.id}/faqs`)
+        .then(res => res.json())
+        .then(res => {
+          if (res.success) setFaqs(res.data);
+        })
+        .finally(() => setFaqsLoading(false));
+    }
+  }, [activeTab, classroom?.id]);
 
   const type =
     activeTab === "teacher-doubts"
@@ -434,6 +455,7 @@ export default function ClassroomPage() {
                       : "Ask Teacher",
                   icon: GraduationCap,
                 },
+                { id: "knowledge-base", label: "Knowledge Base", icon: Layers },
                 { id: "insights", label: "Insights", icon: TrendingUp },
               ].map((tab) => (
                 <button
@@ -741,6 +763,50 @@ export default function ClassroomPage() {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === "knowledge-base" && (
+          <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50 dark:bg-zinc-950/20 border border-slate-200 dark:border-zinc-900 p-4 rounded-xl shadow-sm">
+              <h2 className="text-lg font-bold tracking-tight px-2 flex items-center gap-2">
+                 <Layers className="w-5 h-5 text-purple-500" />
+                 Classroom FAQs
+              </h2>
+            </div>
+            
+            <div className="bg-white dark:bg-zinc-900/50 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 shadow-sm">
+              {faqsLoading ? (
+                <div className="flex justify-center p-12">
+                  <Loader2 className="w-6 h-6 text-purple-500 animate-spin" />
+                </div>
+              ) : faqs.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 text-xs font-bold uppercase tracking-widest opacity-50">
+                  No FAQs available for this classroom yet.
+                </div>
+              ) : (
+                <Accordion type="single" collapsible className="w-full space-y-4">
+                  {faqs.map((faq, i) => (
+                    <AccordionItem key={faq.id} value={`item-${faq.id}`} className="border border-slate-200 dark:border-zinc-800 rounded-xl px-4 bg-slate-50/50 dark:bg-zinc-900/50">
+                      <AccordionTrigger className="text-sm font-bold text-slate-900 dark:text-white hover:no-underline py-4">
+                        <span className="flex items-center gap-3 text-left">
+                          <span className="w-6 h-6 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 border border-purple-500/20 text-xs">
+                            {i + 1}
+                          </span>
+                          <span className="flex flex-col">
+                            <span className="text-purple-500 dark:text-purple-400 text-xs">{faq.topic}</span>
+                            <span>{faq.question}</span>
+                          </span>
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="text-slate-600 dark:text-zinc-400 text-sm leading-relaxed pb-4 pt-2 border-t border-slate-200/60 dark:border-zinc-800/60">
+                        {faq.answer}
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              )}
+            </div>
           </div>
         )}
 
