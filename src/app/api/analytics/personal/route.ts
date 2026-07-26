@@ -81,9 +81,8 @@ export async function GET(req: Request) {
                 { role: "user", content: `Analyze these doubts asked by the student in this classroom:\n\n${doubtContext}` }
             ],
             model: "llama-3.3-70b-versatile",
-            response_format: { type: "json_object" },
-            signal: controller.signal,
-        }).finally(() => clearTimeout(timeoutId));
+            response_format: { type: "json_object" }
+        }, { signal: controller.signal as any }).finally(() => clearTimeout(timeoutId));
 
         const result = JSON.parse(response.choices[0].message.content || "{}");
 

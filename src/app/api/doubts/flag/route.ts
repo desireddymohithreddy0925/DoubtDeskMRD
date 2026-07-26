@@ -54,29 +54,41 @@ export async function POST(req: NextRequest) {
         // the count below the threshold before any of them hides the doubt.
         let autoHidden = false;
         await db.transaction(async (tx: any) => {
-            const locked = await tx.execute(
+            await tx.execute(
                 sql`SELECT ${doubtsTable.id} FROM ${doubtsTable} WHERE ${doubtsTable.id} = ${doubtId} FOR UPDATE`,
             );
+            
+            const [{ count: currentCount }] = await tx
+                .select({ count: count(contentFlagsTable.id) })
+                .from(contentFlagsTable)
+                .where(
+                    and(
+                        eq(contentFlagsTable.doubtId, doubtId),
+                        gte(contentFlagsTable.createdAt, new Date(Date.now() - AUTO_HIDE_WINDOW_MS))
+                    )
+                );
+            
+            const recentFlagCount = Number(currentCount) || 0;
 
-        let autoHidden = false;
-        if (recentFlagCount >= AUTO_HIDE_FLAG_THRESHOLD) {
-            await db.update(doubtsTable).set({ isHidden: true }).where(eq(doubtsTable.id, doubtId));
-            autoHidden = true;
+            if (recentFlagCount >= AUTO_HIDE_FLAG_THRESHOLD) {
+                await tx.update(doubtsTable).set({ isHidden: true }).where(eq(doubtsTable.id, doubtId));
+                autoHidden = true;
 
-            if (doubt.classroomId) {
-                // Best-effort: the flag insert and auto-hide update have already
-                // committed above, so a notification-dispatch failure shouldn't
-                // turn this into an error response for the client.
-                try {
-                    await inngest.send({
-                        name: "doubt/auto-hidden",
-                        data: { doubtId, classroomId: doubt.classroomId },
-                    });
-                } catch (error) {
-                    console.error("Failed to send doubt/auto-hidden event", error);
+                if (doubt.classroomId) {
+                    // Best-effort: the flag insert and auto-hide update have already
+                    // committed above, so a notification-dispatch failure shouldn't
+                    // turn this into an error response for the client.
+                    try {
+                        await inngest.send({
+                            name: "doubt/auto-hidden",
+                            data: { doubtId, classroomId: doubt.classroomId },
+                        });
+                    } catch (error) {
+                        console.error("Failed to send doubt/auto-hidden event", error);
+                    }
                 }
             }
-        }
+        });
 
         return NextResponse.json({
             success: true,

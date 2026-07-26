@@ -1,6 +1,6 @@
 import { eq, and, gte, sql } from "drizzle-orm";
 import { db } from "@/configs/db";
-import { classroomsTable, membershipsTable, notificationsTable } from "@/configs/schema";
+import { classroomsTable, membershipsTable, notificationsTable, usersTable } from "@/configs/schema";
 import { publishNotification, type NotificationRecord } from "@/lib/notifications/realtime";
 
 export type NotificationInput = {
