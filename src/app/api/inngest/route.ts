@@ -12,7 +12,7 @@ import {
     cleanupStaleVideoJobs,
     checkUrgentClassroomActivity,
     notifyFlaggedContentHidden,
-    generateWeeklyFaqs
+    generateClassroomFaqs
 } from "../../../inngest/functions";
 
 // Serve your registered background processes safely
@@ -29,6 +29,6 @@ export const { GET, POST, PUT } = serve({
         cleanupStaleVideoJobs,
         checkUrgentClassroomActivity,
         notifyFlaggedContentHidden,
-        generateWeeklyFaqs
+        generateClassroomFaqs
     ],
 });

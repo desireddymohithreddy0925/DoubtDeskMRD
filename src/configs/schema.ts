@@ -584,24 +584,13 @@ export const resumeAnalysisTable = pgTable("resume_analysis", {
     }).onDelete("cascade"),
 }));
 
-// ═══════════════════════════════════════════════════════════════════
-//   FAQ KNOWLEDGE BASE TABLE
-// ═══════════════════════════════════════════════════════════════════
-
 export const classroomFaqsTable = pgTable("classroom_faqs", {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
-    classroomId: integer().notNull(),
+    classroomId: integer().notNull().references(() => classroomsTable.id, { onDelete: "cascade" }),
     topic: varchar({ length: 255 }).notNull(),
     question: text().notNull(),
     answer: text().notNull(),
     sourceDoubtIds: integer().array().notNull(),
     isPublished: boolean().default(false).notNull(),
     createdAt: timestamp().defaultNow().notNull(),
-}, (table) => ({
-    classroomIdIndex: index("classroom_faqs_classroomId_idx").on(table.classroomId),
-    isPublishedIndex: index("classroom_faqs_isPublished_idx").on(table.isPublished),
-    classroomIdFk: foreignKey({
-        columns: [table.classroomId],
-        foreignColumns: [classroomsTable.id],
-    }).onDelete("cascade"),
-}));
+});

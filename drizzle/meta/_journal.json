@@ -148,6 +148,13 @@
       "when": 1785082766952,
       "tag": "0020_sudden_hydra",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1785085414512,
+      "tag": "0021_clumsy_spirit",
+      "breakpoints": true
     }
   ]
 }
