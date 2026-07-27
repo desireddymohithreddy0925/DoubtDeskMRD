@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, Send, CheckCircle, MessageSquare, Loader2, Upload, File, ZoomIn, MoreVertical, Pencil, Trash2, PlusCircle, Eye, EyeOff, Bold, Italic, Code, List, ThumbsUp, FileText, ExternalLink, AlertTriangle } from "lucide-react";
+import { X, Send, CheckCircle, MessageSquare, Loader2, Upload, File, ZoomIn, MoreVertical, Pencil, Trash2, PlusCircle, Eye, EyeOff, Bold, Italic, Code, List, ThumbsUp, FileText, ExternalLink, AlertTriangle, PenTool } from "lucide-react";
 import { toast } from "sonner";
 import MarkdownRenderer from "@/components/common/MarkdownRenderer";
 import { DeleteConfirmationDialog } from "@/components/common/DeleteConfirmationDialog";
+import WhiteboardModal from "@/components/classroom/WhiteboardModal";
 import { PublicDoubt } from "@/types";
 
 import { OFFLINE_REPLY_QUEUED } from "@/lib/constants/copy-constants";
@@ -43,6 +44,7 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
     const [solutionContent, setSolutionContent] = useState("");
     const [solutionImage, setSolutionImage] = useState("");
     const [fileName, setFileName] = useState("");
+    const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
 
     const [isDoubtOwner, setIsDoubtOwner] = useState(false);
     const [isSolving, setIsSolving] = useState(false);
@@ -935,6 +937,14 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                                     </div>
                                 </div>
                                 <button
+                                    onClick={() => setIsWhiteboardOpen(true)}
+                                    type="button"
+                                    className="px-6 py-5 bg-white/5 hover:bg-white/10 border-2 border-slate-200 dark:border-white/10 hover:border-emerald-500/30 text-slate-700 dark:text-slate-300 rounded-2xl font-black uppercase tracking-widest text-[11px] transition-all flex items-center justify-center gap-2 active:scale-95 group/wb"
+                                >
+                                    <PenTool className="w-4 h-4 text-emerald-500 group-hover/wb:rotate-12 transition-transform" />
+                                    <span className="hidden sm:inline">Whiteboard</span>
+                                </button>
+                                <button
                                     onClick={handlePostOrUpdate}
                                     disabled={isPosting || (!solutionContent.trim() && !solutionImage)}
                                     className="px-10 py-5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] transition-all shadow-xl shadow-emerald-500/20 disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-3 active:scale-95 group/submit"
@@ -1056,6 +1066,17 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                 title="Delete Reply?"
                 description="This action cannot be undone. The reply will be permanently removed."
                 confirmText="Delete Reply"
+            />
+
+            <WhiteboardModal
+                doubtId={doubt.id}
+                isOpen={isWhiteboardOpen}
+                onClose={() => setIsWhiteboardOpen(false)}
+                onExport={(dataUrl) => {
+                    setSolutionImage(dataUrl);
+                    setFileName("whiteboard_export.png");
+                    setIsWhiteboardOpen(false);
+                }}
             />
         </>
     );
