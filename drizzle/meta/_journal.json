@@ -155,6 +155,13 @@
       "when": 1785085414512,
       "tag": "0021_clumsy_spirit",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1785121230471,
+      "tag": "0022_stormy_crystal",
+      "breakpoints": true
     }
   ]
 }

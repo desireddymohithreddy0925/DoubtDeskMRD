@@ -4,12 +4,13 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { db } from "../configs/db";
-import { doubtsTable, usersTable, pendingNotificationsTable, repliesTable, videoJobsTable, classroomsTable, classroomFaqsTable } from "../configs/schema";
-import { eq, inArray, and, lt, gte } from "drizzle-orm";
+import { doubtsTable, usersTable, pendingNotificationsTable, repliesTable, videoJobsTable, classroomsTable, classroomFaqsTable, webhooksTable } from "../configs/schema";
+import { eq, inArray, and, lt, gte, sql } from "drizzle-orm";
 import { emailNotificationLimiter, redisClient } from "@/lib/ratelimit/ratelimit";
 import { sendReplyNotificationEmail, sendDigestEmail } from "@/lib/email/email";
 import { runVideoPipeline } from "../lib/video/pipeline";
 import { groq } from "@/lib/ai/groq-client";
+import { dispatchWebhook } from "@/lib/webhooks/dispatcher";
 
 interface InngestEvent {
     data: Record<string, unknown>;
@@ -493,4 +494,60 @@ The sourceDoubtIds should be an array of integers corresponding to the IDs of th
 
     return { message: `Generated ${generatedCount} FAQs across ${classrooms.length} classrooms.` };
   }
+);
+
+export const dispatchWebhooksOnCreate = inngest.createFunction(
+    { id: "dispatch-webhooks-on-create", triggers: [{ event: "doubt/created" }] },
+    async ({ event, step }: { event: any; step: InngestStep }) => {
+        const { classroomId, doubtId } = event.data;
+        await step.run("dispatch-webhooks", async () => {
+            const webhooks = await db.select().from(webhooksTable).where(and(eq(webhooksTable.classroomId, classroomId), eq(webhooksTable.isActive, true)));
+            
+            const doubtData = await db.select().from(doubtsTable).where(eq(doubtsTable.id, doubtId)).limit(1);
+            const doubt = doubtData[0];
+            if (!doubt) return;
+
+            const matchingWebhooks = webhooks.filter(w => w.events.includes('doubt.created'));
+            
+            for (const webhook of matchingWebhooks) {
+                await dispatchWebhook(webhook.url, webhook.secret, webhook.platform as any, {
+                    event: 'doubt.created',
+                    data: {
+                        subject: doubt.subject,
+                        difficulty: doubt.difficulty,
+                        content: doubt.content,
+                        url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://doubtdesk.com'}/rooms/${classroomId}?tab=community`
+                    }
+                }).catch(err => console.error(`Failed to dispatch webhook ${webhook.id}`, err));
+            }
+        });
+    }
+);
+
+export const dispatchWebhooksOnFlag = inngest.createFunction(
+    { id: "dispatch-webhooks-on-flag", triggers: [{ event: "doubt/auto-hidden" }] },
+    async ({ event, step }: { event: any; step: InngestStep }) => {
+        const { classroomId, doubtId } = event.data;
+        await step.run("dispatch-webhooks", async () => {
+            const webhooks = await db.select().from(webhooksTable).where(and(eq(webhooksTable.classroomId, classroomId), eq(webhooksTable.isActive, true)));
+            
+            const doubtData = await db.select().from(doubtsTable).where(eq(doubtsTable.id, doubtId)).limit(1);
+            const doubt = doubtData[0];
+            if (!doubt) return;
+
+            const matchingWebhooks = webhooks.filter(w => w.events.includes('doubt.flagged'));
+            
+            for (const webhook of matchingWebhooks) {
+                await dispatchWebhook(webhook.url, webhook.secret, webhook.platform as any, {
+                    event: 'doubt.flagged',
+                    data: {
+                        subject: doubt.subject,
+                        difficulty: doubt.difficulty,
+                        content: doubt.content,
+                        url: `${process.env.NEXT_PUBLIC_APP_URL || 'https://doubtdesk.com'}/rooms/${classroomId}?tab=community`
+                    }
+                }).catch(err => console.error(`Failed to dispatch webhook ${webhook.id}`, err));
+            }
+        });
+    }
 );

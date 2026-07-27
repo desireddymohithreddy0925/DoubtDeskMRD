@@ -46,6 +46,7 @@ import AskDoubt from "@/components/classroom/AskDoubt";
 import DoubtCard from "@/components/classroom/DoubtCard";
 import AskAIView from "@/components/classroom/AskAIView";
 import KnowledgeBaseView from "@/components/classroom/KnowledgeBaseView";
+import WebhookSettings from "@/components/classroom/WebhookSettings";
 import ExportButton from "@/components/common/ExportButton";
 import DoubtSortSelect, { DoubtSortValue } from "@/components/classroom/DoubtSortSelect";
 import { toast } from "sonner";
@@ -1242,6 +1243,7 @@ export default function ClassroomPage() {
                   <Save className="w-3.5 h-3.5" /> Save Domains
                 </button>
               </div>
+              <WebhookSettings classroomId={Number(id)} />
             </div>
           </div>
         </div>

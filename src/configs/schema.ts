@@ -593,4 +593,15 @@ export const classroomFaqsTable = pgTable("classroom_faqs", {
     sourceDoubtIds: integer().array().notNull(),
     isPublished: boolean().default(false).notNull(),
     createdAt: timestamp().defaultNow().notNull(),
+});
+
+export const webhooksTable = pgTable("webhooks", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  classroomId: integer().notNull().references(() => classroomsTable.id, { onDelete: "cascade" }),
+  url: text().notNull(),
+  secret: varchar({ length: 64 }).notNull(),
+  platform: varchar({ length: 20 }).notNull(), // 'discord' | 'slack' | 'custom'
+  events: text().array().notNull(), // ['doubt.created', 'doubt.flagged']
+  isActive: boolean().default(true).notNull(),
+  createdAt: timestamp().defaultNow().notNull(),
 });
