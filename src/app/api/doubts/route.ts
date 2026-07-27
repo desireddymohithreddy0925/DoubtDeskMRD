@@ -8,6 +8,7 @@ import {
   repliesTable,
   tagsTable,
   membershipsTable,
+  doubtMeToosTable,
 } from "@/configs/schema";
 import { categorizeDoubt } from "@/lib/ai/categorizer";
 import { safeGenerateEmbedding } from "@/lib/ai/embeddings";
@@ -196,6 +197,12 @@ export async function GET(req: Request) {
         : sql<boolean>`false`
     ).mapWith(Boolean);
 
+    const hasMeTooSql = (
+      email
+        ? sql<boolean>`EXISTS (SELECT 1 FROM ${doubtMeToosTable} WHERE ${doubtMeToosTable.doubtId} = ${doubtsTable.id} AND ${doubtMeToosTable.userEmail} = ${email})`
+        : sql<boolean>`false`
+    ).mapWith(Boolean);
+
     const [totalCountRow] = await db
       .select({ count: count() })
       .from(doubtsTable)
@@ -208,6 +215,7 @@ export async function GET(req: Request) {
         replyCount: replyCountSql,
         hasLiked: hasLikedSql,
         hasBookmarked: hasBookmarkedSql,
+        hasMeToo: hasMeTooSql,
       })
       .from(doubtsTable);
 

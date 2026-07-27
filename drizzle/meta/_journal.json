@@ -162,6 +162,13 @@
       "when": 1785121230471,
       "tag": "0022_stormy_crystal",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1785126765511,
+      "tag": "0023_fat_meteorite",
+      "breakpoints": true
     }
   ]
 }

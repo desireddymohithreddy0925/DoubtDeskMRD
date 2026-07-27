@@ -121,6 +121,7 @@ export const doubtsTable = pgTable("doubts", {
     isSolved: varchar({ length: 20 }).default("unsolved"),
     solvedReplyId: integer(),
     type: varchar({ length: 20 }).default("community"),
+    meTooCount: integer().default(0).notNull(),
     isPinned: boolean().default(false),
     isHidden: boolean("isHidden").default(false).notNull(),
     deletedAt: timestamp(),
@@ -604,4 +605,13 @@ export const webhooksTable = pgTable("webhooks", {
   events: text().array().notNull(), // ['doubt.created', 'doubt.flagged']
   isActive: boolean().default(true).notNull(),
   createdAt: timestamp().defaultNow().notNull(),
-});
+});
+
+export const doubtMeToosTable = pgTable("doubt_me_toos", {
+  id: integer().primaryKey().generatedAlwaysAsIdentity(),
+  doubtId: integer().notNull().references(() => doubtsTable.id, { onDelete: "cascade" }),
+  userEmail: varchar({ length: 255 }).notNull().references(() => usersTable.email, { onDelete: "cascade" }),
+  createdAt: timestamp().defaultNow().notNull(),
+}, (table) => ({
+  uniqueUserDoubt: unique("doubt_me_toos_user_doubt_unique").on(table.doubtId, table.userEmail),
+}));
