@@ -66,34 +66,140 @@ export function generateUnsubscribeLink(email: string, appUrl: string) {
     return url.toString();
 }
 
-export async function sendWarningEmail(email: string, reason: string, strikes: number) {
-    console.log(`[EMAIL SIMULATION] To: ${email}, Subject: Safety Warning - DoubtDesk, Message: Your post was flagged for: ${reason}. You have ${strikes}/3 strikes. Further violations will result in an automatic account block.`);
-    
-    // Placeholder for actual email service integration (e.g., Resend)
-    /*
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    await resend.emails.send({
-      from: 'Safety @ DoubtDesk <safety@doubtdesk.com>',
-      to: email,
-      subject: 'Safety Warning - DoubtDesk',
-      html: `<p>Your post was flagged for: <strong>${reason}</strong>.</p>
-             <p>This is strike <strong>${strikes}</strong> of 3.</p>
-             <p>Further violations will result in an automatic account block.</p>`
+export type EmailSendResult = {
+    success: boolean;
+    simulated?: boolean;
+    error?: string;
+    /** Resend message id when the provider accepted the send request (not final delivery). */
+    providerMessageId?: string;
+};
+
+function isResendConfigured() {
+    const apiKey = process.env.RESEND_API_KEY;
+    return Boolean(apiKey && apiKey !== "re_your_actual_key_here");
+}
+
+function getResendFromAddress() {
+    const from = process.env.RESEND_FROM_EMAIL?.trim();
+    return from || null;
+}
+
+function escapeHtml(value: string) {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+async function sendResendEmail(params: {
+    toEmail: string;
+    subject: string;
+    html: string;
+    logLabel: string;
+}): Promise<EmailSendResult> {
+    const { toEmail, subject, html, logLabel } = params;
+
+    if (!isResendConfigured()) {
+        console.log(`[EMAIL SIMULATION] Skipping real delivery for ${logLabel}. Resend API Key is not configured.`);
+        return {
+            success: false,
+            simulated: true,
+            error: "Email delivery unavailable: RESEND_API_KEY is not configured",
+        };
+    }
+
+    const from = getResendFromAddress();
+    if (!from) {
+        console.log(`[EMAIL SIMULATION] Skipping real delivery for ${logLabel}. RESEND_FROM_EMAIL is not configured.`);
+        return {
+            success: false,
+            simulated: true,
+            error: "Email delivery unavailable: RESEND_FROM_EMAIL is not configured",
+        };
+    }
+
+    try {
+        const res = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+            },
+            body: JSON.stringify({
+                from,
+                to: [toEmail],
+                subject,
+                html,
+            }),
+            signal: AbortSignal.timeout(10000),
+        });
+
+        if (res.ok) {
+            const payload = await res.json().catch(() => ({} as { id?: string }));
+            const providerMessageId =
+                typeof payload?.id === "string" ? payload.id : undefined;
+            // res.ok means Resend accepted the request; delivery is confirmed via webhooks.
+            console.log(`[EMAIL SUCCESS] ${logLabel} accepted by Resend`);
+            return { success: true, simulated: false, providerMessageId };
+        }
+
+        const errText = await res.text();
+        console.error(`[EMAIL ERROR] Resend API responded with status ${res.status}`);
+        return { success: false, error: errText };
+    } catch (error: unknown) {
+        console.error(`[EMAIL ERROR] Failed to send ${logLabel} via Resend`);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+}
+
+export async function sendWarningEmail(
+    email: string,
+    reason: string,
+    strikes: number,
+): Promise<EmailSendResult> {
+    const subject = "Safety Warning - DoubtDesk";
+    const html = `
+      <p>Your post was flagged for: <strong>${escapeHtml(reason)}</strong>.</p>
+      <p>This is strike <strong>${strikes}</strong> of 3.</p>
+      <p>Further violations will result in an automatic account block.</p>
+    `;
+
+    console.log(`[EMAIL] Preparing warning email (${strikes}/3 strikes)`);
+    return sendResendEmail({
+        toEmail: email,
+        subject,
+        html,
+        logLabel: "warning email",
     });
-    */
 }
 
 /**
- * Simulates sending a blocking notification email.
+ * Sends a blocking notification email.
  */
-export async function sendBlockEmail(email: string, durationDays: number, totalBlocks: number) {
+export async function sendBlockEmail(
+    email: string,
+    durationDays: number,
+    totalBlocks: number,
+): Promise<EmailSendResult> {
     const unlockDate = new Date();
     unlockDate.setDate(unlockDate.getDate() + durationDays);
 
-    console.log(`[EMAIL SIMULATION] To: ${email} | Subject: Account Temporarily Blocked`);
-    console.log(`Body: Your account has been suspended for ${durationDays} days due to repeated safety violations. This is your block #${totalBlocks}. Your access will be restored on ${unlockDate.toDateString()}.`);
-    
-    // In production, integrate with Resend here.
+    const subject = "Account Temporarily Blocked - DoubtDesk";
+    const html = `
+      <p>Your account has been suspended for <strong>${durationDays} days</strong> due to repeated safety violations.</p>
+      <p>This is block <strong>#${totalBlocks}</strong>.</p>
+      <p>Your access will be restored on <strong>${unlockDate.toDateString()}</strong>.</p>
+    `;
+
+    console.log(`[EMAIL] Preparing block email (durationDays=${durationDays}, blockCount=${totalBlocks})`);
+    return sendResendEmail({
+        toEmail: email,
+        subject,
+        html,
+        logLabel: "block email",
+    });
 }
 
 /**
