@@ -1,7 +1,9 @@
 import {
+    escapeHtml,
     generateUnsubscribeLink,
     generateUnsubscribeToken,
     sendBlockEmail,
+    sendReplyNotificationEmail,
     sendWarningEmail,
     verifyUnsubscribeToken,
 } from '@/lib/email/email';
@@ -93,5 +95,94 @@ describe('Email Helper Functions', () => {
             url.searchParams.get('expires'),
             url.searchParams.get('token')
         )).toBe(true);
+    });
+
+    describe('escapeHtml', () => {
+        it('should escape XSS payloads', () => {
+            const input = '<img src=x onerror="alert(1)">';
+            const result = escapeHtml(input);
+            expect(result).toBe('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
+            expect(result).not.toContain('<img');
+        });
+
+        it('should escape HTML tags', () => {
+            const input = '<b>Hello</b>';
+            const result = escapeHtml(input);
+            expect(result).toBe('&lt;b&gt;Hello&lt;/b&gt;');
+        });
+
+        it('should leave normal text unchanged', () => {
+            const input = 'Hello World';
+            expect(escapeHtml(input)).toBe('Hello World');
+        });
+
+        it('should escape all special characters', () => {
+            const input = '<>&\'"';
+            const result = escapeHtml(input);
+            expect(result).toBe('&lt;&gt;&amp;&#039;&quot;');
+        });
+    });
+
+    describe('sendReplyNotificationEmail', () => {
+        let fetchSpy: jest.SpiedFunction<typeof fetch>;
+
+        beforeEach(() => {
+            fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue({
+                ok: true,
+                text: () => Promise.resolve('Email sent'),
+            } as Response);
+            process.env.RESEND_API_KEY = 're_test_key';
+            process.env.NEXT_PUBLIC_APP_URL = 'https://doubtdesk.example';
+        });
+
+        afterEach(() => {
+            fetchSpy.mockRestore();
+            delete process.env.RESEND_API_KEY;
+            delete process.env.NEXT_PUBLIC_APP_URL;
+        });
+
+        it('should preserve original characters in email subject', async () => {
+            const testSubject = 'A & B <script>alert("xss")</script>';
+            
+            await sendReplyNotificationEmail({
+                toEmail: 'user@example.com',
+                doubtId: 1,
+                doubtSubject: testSubject,
+                doubtContent: 'Test content',
+                replierName: 'Test Replier',
+                replyContent: 'Test reply',
+            });
+
+            const fetchCall = fetchSpy.mock.calls[0];
+            const requestBody = JSON.parse(fetchCall[1]?.body as string);
+            
+            // Subject should contain original characters, not escaped
+            expect(requestBody.subject).toContain('A & B');
+            expect(requestBody.subject).toContain('<script>');
+            expect(requestBody.subject).not.toContain('&amp;');
+            expect(requestBody.subject).not.toContain('&lt;');
+        });
+
+        it('should escape HTML in email body', async () => {
+            const testSubject = 'A & B <script>alert("xss")</script>';
+            
+            await sendReplyNotificationEmail({
+                toEmail: 'user@example.com',
+                doubtId: 1,
+                doubtSubject: testSubject,
+                doubtContent: 'Test content',
+                replierName: 'Test Replier',
+                replyContent: 'Test reply',
+            });
+
+            const fetchCall = fetchSpy.mock.calls[0];
+            const requestBody = JSON.parse(fetchCall[1]?.body as string);
+            
+            // HTML body should contain escaped values
+            expect(requestBody.html).toContain('A &amp; B');
+            expect(requestBody.html).toContain('&lt;script&gt;');
+            expect(requestBody.html).not.toContain('A & B');
+            expect(requestBody.html).not.toContain('<script>');
+        });
     });
 });
