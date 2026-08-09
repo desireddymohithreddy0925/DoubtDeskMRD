@@ -66,7 +66,6 @@ describe('Email Helper Functions', () => {
             expect.stringContaining('student@college.edu')
         );
 
-        fetchSpy.mockRestore();
         delete process.env.RESEND_API_KEY;
         delete process.env.RESEND_FROM_EMAIL;
     });
