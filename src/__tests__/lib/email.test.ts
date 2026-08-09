@@ -65,6 +65,10 @@ describe('Email Helper Functions', () => {
         expect(consoleSpy).not.toHaveBeenCalledWith(
             expect.stringContaining('student@college.edu')
         );
+
+        fetchSpy.mockRestore();
+        delete process.env.RESEND_API_KEY;
+        delete process.env.RESEND_FROM_EMAIL;
     });
 
     it('should accept warning emails through Resend when configured', async () => {
