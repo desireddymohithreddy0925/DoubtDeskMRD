@@ -5,14 +5,15 @@ import { eq, and } from "drizzle-orm";
 import { currentUser } from "@clerk/nextjs/server";
 import { requireTeacher, requireMembership } from "@/lib/auth/membership-guard";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const user = await currentUser();
         if (!user?.primaryEmailAddress?.emailAddress) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
         const email = user.primaryEmailAddress.emailAddress;
-        const classroomId = parseInt(params.id, 10);
+        const { id } = await params;
+        const classroomId = parseInt(id, 10);
 
         if (isNaN(classroomId)) {
             return NextResponse.json({ error: "Invalid classroom ID" }, { status: 400 });
@@ -42,14 +43,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
         const user = await currentUser();
         if (!user?.primaryEmailAddress?.emailAddress) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
         const email = user.primaryEmailAddress.emailAddress;
-        const classroomId = parseInt(params.id, 10);
+        const { id } = await params;
+        const classroomId = parseInt(id, 10);
 
         if (isNaN(classroomId)) {
             return NextResponse.json({ error: "Invalid classroom ID" }, { status: 400 });

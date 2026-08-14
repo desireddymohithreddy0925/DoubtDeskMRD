@@ -217,6 +217,9 @@ export const repliesTable = pgTable("replies", {
     readabilityScore: integer("readability_score"),
     pedagogyDrifted: boolean("pedagogy_drifted").default(false),
     driftExplanation: text("drift_explanation"),
+    originalCode: text("original_code"),
+    correctedCode: text("corrected_code"),
+    language: varchar("language", { length: 50 }).default("javascript"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
     doubtIdIndex: index("doubtId_idx").on(table.doubtId),

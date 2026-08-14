@@ -7,6 +7,7 @@ import MarkdownRenderer from "@/components/common/MarkdownRenderer";
 import { DeleteConfirmationDialog } from "@/components/common/DeleteConfirmationDialog";
 import WhiteboardModal from "@/components/classroom/WhiteboardModal";
 import { PublicDoubt } from "@/types";
+import CodeDiffViewer from "@/components/code/CodeDiffViewer";
 
 import { OFFLINE_REPLY_QUEUED } from "@/lib/constants/copy-constants";
 interface Reply {
@@ -18,6 +19,9 @@ interface Reply {
     type: 'comment' | 'solution';
     content: string | null;
     imageUrl: string | null;
+    originalCode?: string | null;
+    correctedCode?: string | null;
+    language?: string | null;
     upvotes: number;
     hasUpvoted?: boolean;
     createdAt: string;
@@ -44,6 +48,10 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
     const [solutionContent, setSolutionContent] = useState("");
     const [solutionImage, setSolutionImage] = useState("");
     const [fileName, setFileName] = useState("");
+    const [showCodeDiffForm, setShowCodeDiffForm] = useState(false);
+    const [originalCode, setOriginalCode] = useState("");
+    const [correctedCode, setCorrectedCode] = useState("");
+    const [codeLanguage, setCodeLanguage] = useState("javascript");
     const [isWhiteboardOpen, setIsWhiteboardOpen] = useState(false);
 
     const [isDoubtOwner, setIsDoubtOwner] = useState(false);
@@ -157,6 +165,9 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                     type,
                     content,
                     imageUrl,
+                    originalCode: type === 'solution' && showCodeDiffForm ? originalCode : null,
+                    correctedCode: type === 'solution' && showCodeDiffForm ? correctedCode : null,
+                    language: type === 'solution' && showCodeDiffForm ? codeLanguage : null,
                     createdAt: new Date().toISOString()
                 };
                 const { addToQueue } = await import("@/lib/offline/syncQueue");
@@ -180,6 +191,9 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                     setSolutionContent("");
                     setSolutionImage("");
                     setFileName("");
+                    setOriginalCode("");
+                    setCorrectedCode("");
+                    setShowCodeDiffForm(false);
                     setShowSolutionForm(false);
                 }
 
@@ -196,7 +210,10 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
 
                     type,
                     content,
-                    imageUrl
+                    imageUrl,
+                    originalCode: type === 'solution' && showCodeDiffForm ? originalCode : null,
+                    correctedCode: type === 'solution' && showCodeDiffForm ? correctedCode : null,
+                    language: type === 'solution' && showCodeDiffForm ? codeLanguage : null,
                 })
             });
 
@@ -215,6 +232,9 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                     setSolutionContent("");
                     setSolutionImage("");
                     setFileName("");
+                    setOriginalCode("");
+                    setCorrectedCode("");
+                    setShowCodeDiffForm(false);
                     setShowSolutionForm(false);
                     setEditingId(null);
                 }
@@ -251,7 +271,10 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     content: solutionContent,
-                    imageUrl: solutionImage
+                    imageUrl: solutionImage,
+                    originalCode: showCodeDiffForm ? originalCode : null,
+                    correctedCode: showCodeDiffForm ? correctedCode : null,
+                    language: showCodeDiffForm ? codeLanguage : null,
                 })
             });
 
@@ -262,6 +285,9 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                 setSolutionContent("");
                 setSolutionImage("");
                 setFileName("");
+                setOriginalCode("");
+                setCorrectedCode("");
+                setShowCodeDiffForm(false);
                 setShowSolutionForm(false);
                 toast.success("Solution updated!", { id: `reply-update-${editingId}` });
             } else {
@@ -483,6 +509,14 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                                                     if (reply.type === 'solution') {
                                                         setSolutionContent(reply.content || "");
                                                         setSolutionImage(reply.imageUrl || "");
+                                                        setOriginalCode(reply.originalCode || "");
+                                                        setCorrectedCode(reply.correctedCode || "");
+                                                        setCodeLanguage(reply.language || "javascript");
+                                                        if (reply.originalCode && reply.correctedCode) {
+                                                            setShowCodeDiffForm(true);
+                                                        } else {
+                                                            setShowCodeDiffForm(false);
+                                                        }
                                                         setEditingId(reply.id);
                                                         setShowSolutionForm(true);
                                                         setMenuOpenId(null);
@@ -594,6 +628,15 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                                             </div>
                                         </button>
                                     )
+                                )}
+                                {reply.type === 'solution' && reply.originalCode && reply.correctedCode && (
+                                    <div className="mt-4">
+                                        <CodeDiffViewer
+                                            originalCode={reply.originalCode}
+                                            correctedCode={reply.correctedCode}
+                                            language={reply.language || "javascript"}
+                                        />
+                                    </div>
                                 )}
                             </>
                         )}
@@ -826,6 +869,9 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                                         setSolutionContent("");
                                         setSolutionImage("");
                                         setFileName("");
+                                        setOriginalCode("");
+                                        setCorrectedCode("");
+                                        setShowCodeDiffForm(false);
                                     }}
                                     className="p-3 hover:bg-slate-100 dark:hover:bg-white/5 rounded-2xl text-slate-500 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all hover:rotate-90"
                                     aria-label="Close form"
@@ -838,6 +884,12 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                                 <button onClick={() => insertMarkdown(solutionTextareaRef, "italic", setSolutionContent)} className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl text-slate-600 dark:text-slate-400"><Italic className="w-4 h-4" /></button>
                                 <button onClick={() => insertMarkdown(solutionTextareaRef, "code", setSolutionContent)} className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl text-slate-600 dark:text-slate-400"><Code className="w-4 h-4" /></button>
                                 <button onClick={() => insertMarkdown(solutionTextareaRef, "list", setSolutionContent)} className="p-2 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl text-slate-600 dark:text-slate-400"><List className="w-4 h-4" /></button>
+                                <button 
+                                    onClick={() => setShowCodeDiffForm(!showCodeDiffForm)} 
+                                    className={`flex items-center gap-2 px-3 py-1.5 ml-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${showCodeDiffForm ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white/5 border border-slate-200 dark:border-white/10 text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}
+                                >
+                                    <SplitSquareVertical className="w-3.5 h-3.5" /> Code Diff
+                                </button>
                                 <div className="w-px h-6 bg-slate-200 dark:bg-white/10 mx-2" />
                                 <button 
                                     onClick={() => setIsPreviewMode(!isPreviewMode)} 
@@ -860,6 +912,43 @@ export default function DoubtRepliesModal({ doubt, isOpen, onClose, onReplyChang
                                     placeholder="Explain your solution clearly and step-by-step..."
                                     className="w-full h-40 bg-white/50 dark:bg-slate-950/50 border border-slate-200 dark:border-white/10 rounded-[1.5rem] p-5 text-slate-900 dark:text-white text-sm focus:outline-none focus:border-emerald-500/50 focus:ring-4 focus:ring-emerald-500/10 transition-all resize-none font-medium leading-relaxed placeholder:text-slate-600 shadow-inner"
                                 />
+                            )}
+
+                            {showCodeDiffForm && (
+                                <div className="animate-in fade-in duration-300 border border-slate-200 dark:border-white/10 rounded-2xl bg-slate-50 dark:bg-slate-950 p-4 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <h4 className="text-xs font-bold uppercase text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                            <SplitSquareVertical className="w-4 h-4" /> Code Diff Details
+                                        </h4>
+                                        <input
+                                            type="text"
+                                            value={codeLanguage}
+                                            onChange={(e) => setCodeLanguage(e.target.value)}
+                                            placeholder="Language (e.g. javascript)"
+                                            className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-slate-900 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500/50"
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-[10px] font-black uppercase text-slate-500 mb-1 tracking-widest">Original Code</label>
+                                            <textarea
+                                                value={originalCode}
+                                                onChange={(e) => setOriginalCode(e.target.value)}
+                                                className="w-full h-32 bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-xl p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500/50 resize-none font-mono"
+                                                placeholder="Paste buggy code..."
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] font-black uppercase text-emerald-500 mb-1 tracking-widest">Corrected Code</label>
+                                            <textarea
+                                                value={correctedCode}
+                                                onChange={(e) => setCorrectedCode(e.target.value)}
+                                                className="w-full h-32 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-500/20 rounded-xl p-3 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-emerald-500/50 resize-none font-mono"
+                                                placeholder="Paste fixed code..."
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                             )}
 
                             {solutionImage && (
