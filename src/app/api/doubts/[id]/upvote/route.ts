@@ -5,7 +5,10 @@ import { repliesTable, replyLikesTable, doubtsTable, membershipsTable } from "@/
 import { eq, and, sql } from "drizzle-orm";
 import { buildErrorResponse } from "@/lib/errors/error-handler";
 import { inngest } from "@/inngest/client";
+import { limitRequestBodySize } from "@/lib/validations/validate";
 import { currentUser } from "@clerk/nextjs/server";
+import { enforceApiRateLimit } from "@/lib/ratelimit/api-rate-limit";
+import { generalLimiter } from "@/lib/ratelimit/ratelimit";
 
 export async function POST(
     req: NextRequest,
@@ -24,6 +27,9 @@ export async function POST(
         // instead of the non-unique display name (userName) to align with global vote endpoints.
         const stableUserIdentifier = user.primaryEmailAddress.emailAddress; 
 
+        const rateLimitResponse = await enforceApiRateLimit(generalLimiter, stableUserIdentifier, "general");
+        if (rateLimitResponse) return rateLimitResponse;
+
         // ── 2. NEXT.JS 15 ASYNC PARAMS RESOLUTION ────────────────────────────
         const { id } = await params;
         const doubtId = parseInt(id);
@@ -31,6 +37,9 @@ export async function POST(
         if (isNaN(doubtId)) {
             return NextResponse.json({ error: "Invalid doubt id" }, { status: 400 });
         }
+
+        const sizeError = await limitRequestBodySize(req);
+        if (sizeError) return sizeError;
 
         const body = await req.json();
         const { replyId } = body as { replyId: number };

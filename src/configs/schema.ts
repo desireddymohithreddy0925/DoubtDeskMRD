@@ -18,7 +18,7 @@ export const usersTable = pgTable("users", {
     blockCount: integer().default(0).notNull(),
     emailNotificationsEnabled: boolean().default(true).notNull(),
     notificationPreference: varchar({ length: 50 }).default("instant").notNull(),
-    themePreference: varchar({ length: 10 }).default("system").notNull(),
+    themePreference: varchar({ length: 20 }).default("system").notNull(),
     interests: text(),
     learningGoals: text(),
     subjects: text(),
@@ -557,7 +557,10 @@ export const organizationMembershipsTable = pgTable("organization_memberships", 
     userEmail: varchar({ length: 255 }).notNull(),
     role: varchar({ length: 20 }).notNull(),
     createdAt: timestamp().defaultNow().notNull(),
-});
+}, (table) => ({
+    organizationIdIndex: index("organization_memberships_organization_id_idx").on(table.organizationId),
+    userEmailIndex: index("organization_memberships_user_email_idx").on(table.userEmail),
+}));
 
 export const coverLettersTable = pgTable("cover_letters", {
     id: integer().primaryKey().generatedAlwaysAsIdentity(),
@@ -617,4 +620,23 @@ export const doubtMeToosTable = pgTable("doubt_me_toos", {
   createdAt: timestamp().defaultNow().notNull(),
 }, (table) => ({
   uniqueUserDoubt: unique("doubt_me_toos_user_doubt_unique").on(table.doubtId, table.userEmail),
+}));
+
+export const discussionThreadsTable = pgTable("discussion_threads", {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    title: varchar({ length: 255 }).notNull(),
+    description: text().notNull().default(""),
+    category: varchar({ length: 100 }).notNull().default("General"),
+    authorEmail: varchar({ length: 255 }).notNull(),
+    authorName: varchar({ length: 255 }).notNull(),
+    isAnonymous: boolean().default(false).notNull(),
+    replyCount: integer().default(0).notNull(),
+    createdAt: timestamp().defaultNow().notNull(),
+    updatedAt: timestamp().defaultNow().notNull(),
+}, (table) => ({
+    authorEmailFk: foreignKey({
+        columns: [table.authorEmail],
+        foreignColumns: [usersTable.email],
+    }).onDelete("cascade"),
+    createdAtIndex: index("discussion_threads_created_at_idx").on(table.createdAt),
 }));

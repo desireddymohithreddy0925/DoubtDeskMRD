@@ -40,12 +40,16 @@ const SHARE_MESSAGES = {
     MENU_TELEGRAM: "Share on Telegram"
 };
 
+const TEACHER_ROLES = new Set(["teacher", "owner", "admin"]);
+const isTeacherRole = (role?: string) => TEACHER_ROLES.has(role ?? "");
+
 interface DoubtCardProps {
     doubt: PublicDoubt & {
         tags?: Tag[];
         hasBookmarked?: boolean;
         hasLiked?: boolean;
         replyCount?: number;
+        hasSolutionReply?: boolean;
     };
     onUpdate?: () => void;
     onViewAISolution?: (
@@ -54,6 +58,7 @@ interface DoubtCardProps {
             hasBookmarked?: boolean;
             hasLiked?: boolean;
             replyCount?: number;
+            hasSolutionReply?: boolean;
         },
     ) => void;
     role?: string;
@@ -82,7 +87,7 @@ export default function DoubtCard({ doubt, onUpdate, onViewAISolution, role, ope
     const searchParams = useSearchParams();
     const lastAutoOpenedThread = useRef<string | null>(null);
 
-    const isTeacher = role === 'teacher';
+    const isTeacher = isTeacherRole(role);
 
     const { isSignedIn } = useUser();
 
@@ -104,9 +109,10 @@ export default function DoubtCard({ doubt, onUpdate, onViewAISolution, role, ope
     }, [doubt.id, openRepliesOnMount, searchParams]);
 
     const handleAction = async (action: string) => {
+        const likeDelta = doubt.hasLiked ? -1 : 1;
         if (action === "like") {
             setIsLiking(true);
-            setLikes(prev => prev + 1);
+            setLikes(prev => prev + likeDelta);
         }
         if (action === "solve") setIsSolving(true);
 
@@ -128,10 +134,11 @@ export default function DoubtCard({ doubt, onUpdate, onViewAISolution, role, ope
                     toast.success(statusText);
                 }
             } else if (!res.ok) {
+                if (action === "like") setLikes(prev => prev - likeDelta);
                 toast.error(data.error || `Failed to ${action} doubt.`);
             }
         } catch (error) {
-            if(action === 'like') setLikes(prev => prev -1);
+            if (action === "like") setLikes(prev => prev - likeDelta);
 
             console.error(`Action ${action} failed:`, error);
             toast.error(`Failed to ${action} doubt.`);
@@ -473,7 +480,7 @@ export default function DoubtCard({ doubt, onUpdate, onViewAISolution, role, ope
                                 </DropdownMenuContent>
                             </DropdownMenu>
 
-                            {((isOwner && doubt.type !== 'ai') || isTeacher) && doubt.isSolved !== "solved" && (
+                            {((isOwner && doubt.type !== 'ai') || (isTeacher && (isOwner || doubt.hasSolutionReply))) && doubt.isSolved !== "solved" && (
                                 <button
                                     onClick={() => handleAction("solve")}
                                     disabled={isSolving}
@@ -486,21 +493,23 @@ export default function DoubtCard({ doubt, onUpdate, onViewAISolution, role, ope
 
                             {doubt.isSolved === "solved" && (
                                 <>
-                                    <button
-                                        onClick={() => {
-                                            if (doubt.type === 'ai' && onViewAISolution) {
-                                                onViewAISolution(doubt);
-                                            } else if (onCommentClick) {
-                                                onCommentClick();
-                                            } else if (!disableModal) {
-                                                setIsRepliesOpen(true);
-                                            }
-                                        }}
-                                        className="flex-1 sm:flex-none flex items-center justify-center gap-3 px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl transition-all shadow-2xl shadow-emerald-500/30 active:scale-95 group/sol whitespace-nowrap"
-                                    >
-                                        <CheckCircle className="w-4 h-4 fill-white/20 group-hover/sol:scale-110 transition-transform flex-shrink-0" />
-                                        <span className="text-[11px] font-black uppercase tracking-[0.2em]">View Official Solution</span>
-                                    </button>
+                                    {doubt.solvedReplyId && (
+                                        <button
+                                            onClick={() => {
+                                                if (doubt.type === 'ai' && onViewAISolution) {
+                                                    onViewAISolution(doubt);
+                                                } else if (onCommentClick) {
+                                                    onCommentClick();
+                                                } else if (!disableModal) {
+                                                    setIsRepliesOpen(true);
+                                                }
+                                            }}
+                                            className="flex-1 sm:flex-none flex items-center justify-center gap-3 px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl transition-all shadow-2xl shadow-emerald-500/30 active:scale-95 group/sol whitespace-nowrap"
+                                        >
+                                            <CheckCircle className="w-4 h-4 fill-white/20 group-hover/sol:scale-110 transition-transform flex-shrink-0" />
+                                            <span className="text-[11px] font-black uppercase tracking-[0.2em]">View Official Solution</span>
+                                        </button>
+                                    )}
 
                                     {isSignedIn && !disableModal && (
                                         <button

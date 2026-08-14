@@ -63,6 +63,26 @@ global.ResizeObserver = class ResizeObserver {
     unobserve() {}
 };
 
+// Mock EventSource (used by usePresence via DoubtRepliesModal)
+(global as any).EventSource = class EventSource {
+    static instances: EventSource[] = [];
+    onmessage: ((event: any) => void) | null = null;
+    onerror: ((event: any) => void) | null = null;
+    constructor(public url: string) {
+        (this.constructor as any).instances.push(this);
+    }
+    close() {}
+};
+
+// Mock PointerEvent and PointerCapture for Radix UI components
+if (typeof global.PointerEvent === 'undefined') {
+    class PointerEvent extends MouseEvent {}
+    global.PointerEvent = PointerEvent as any;
+}
+Element.prototype.hasPointerCapture = () => false;
+Element.prototype.setPointerCapture = () => {};
+Element.prototype.releasePointerCapture = () => {};
+
 // Mock scrollIntoView
 Element.prototype.scrollIntoView = jest.fn();
 

@@ -5,6 +5,7 @@ import { eq, and } from 'drizzle-orm';
 import { currentUser } from '@clerk/nextjs/server';
 import { errorResponse, buildErrorResponse } from '@/lib/errors/error-handler';
 import { checkUserBlock } from '@/lib/auth/auth-utils';
+import { limitRequestBodySize } from '@/lib/validations/validate';
 import { z } from 'zod';
 
 // FIXED: Tightened schema validation to match db varchar(255) constraints
@@ -41,7 +42,16 @@ export async function GET() {
       )
       .where(eq(organizationMembershipsTable.userEmail, email));
 
-    return NextResponse.json(userOrgs);
+    // Strip ownerEmail for non-owner/non-admin members to prevent PII leakage
+    const sanitizedOrgs = userOrgs.map((org) => {
+      if (org.role === 'owner' || org.role === 'admin') {
+        return org;
+      }
+      const { ownerEmail, ...safe } = org;
+      return safe;
+    });
+
+    return NextResponse.json(sanitizedOrgs);
   } catch (error) {
     const { status, body } = buildErrorResponse(error);
     return NextResponse.json(body, { status });
@@ -65,6 +75,9 @@ export async function POST(req: Request) {
     if (!dbUser) {
       return errorResponse('User profile not found', 403);
     }
+
+    const sizeError = await limitRequestBodySize(req);
+    if (sizeError) return sizeError;
 
     const jsonBody = await req.json();
     const parsed = createOrgSchema.safeParse(jsonBody);
